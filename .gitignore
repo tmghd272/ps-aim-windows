@@ -1,0 +1,16 @@
+﻿# Rust
+target/
+
+# Electron
+ui/node_modules/
+ui/dist/
+
+# Build artifacts
+release/
+tracker/vendor/ps3eyedriver/obj/
+tracker/vendor/ps3eyedriver/*.exe
+tracker/vendor/ps3eyedriver/*.obj
+tracker/vendor/ps3eyedriver/*.pdb
+
+# Temp
+*.tmp

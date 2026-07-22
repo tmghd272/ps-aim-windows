@@ -1,0 +1,20 @@
+const { contextBridge, ipcRenderer } = require('electron');
+contextBridge.exposeInMainWorld('api', {
+  readConfig:     () => ipcRenderer.invoke('read-config'),
+  writeConfig:    (c) => ipcRenderer.invoke('write-config', c),
+  resetConfig:    () => ipcRenderer.invoke('reset-config'),
+  readUiConfig:   () => ipcRenderer.invoke('read-ui-config'),
+  writeUiConfig:  (c) => ipcRenderer.invoke('write-ui-config', c),
+  startDriver:    (c) => ipcRenderer.invoke('start-driver', c),
+  stopDriver:     () => ipcRenderer.invoke('stop-driver'),
+  driverStatus:   () => ipcRenderer.invoke('driver-status'),
+  getLog:         () => ipcRenderer.invoke('get-log'),
+  findDriverExe:  (h) => ipcRenderer.invoke('find-driver-exe', h),
+  hidhide:        (a, c) => ipcRenderer.invoke('hidhide', a, c),
+  browseExe:      () => ipcRenderer.invoke('browse-exe'),
+  minimize:       () => ipcRenderer.invoke('minimize'),
+  resizeWindow:   (a, b, h) => ipcRenderer.invoke('resize-window', a, b, h),
+  onLogLine:      (cb) => ipcRenderer.on('log-line', (_, l) => cb(l)),
+  onDriverExited: (cb) => ipcRenderer.on('driver-exited', () => cb()),
+  debugPaths:     () => ipcRenderer.invoke('debug-paths'),
+});

@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PS Aim Controller</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root[data-theme="light"] {
+  --bg: #f0f0f5; --surface: #ffffff; --border: #d0d0de;
+  --accent: #e8401c; --accent2: #ff6b3d;
+  --text: #1a1a2e; --muted: #6b6b80; --green: #1a9e4a; --radius: 8px;
+}
+:root {
+  --bg: #0f0f13; --surface: #18181f; --border: #2a2a35;
+  --accent: #e8401c; --accent2: #ff6b3d;
+  --text: #e8e8ee; --muted: #6b6b80; --green: #2ecc71; --radius: 8px;
+}
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; user-select: none; }
+.titlebar { display: flex; align-items: center; justify-content: space-between; padding: 0 16px; height: 38px; background: var(--surface); border-bottom: 1px solid var(--border); -webkit-app-region: drag; flex-shrink: 0; }
+.titlebar-title { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.tb-controls { display: flex; gap: 8px; -webkit-app-region: no-drag; }
+.tb-btn { width: 12px; height: 12px; border-radius: 50%; border: none; cursor: pointer; }
+.tb-close { background: #e8441c; } .tb-min { background: #e8bc1c; }
+.status-bar { display: flex; align-items: center; gap: 10px; padding: 8px 16px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.sdot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex-shrink: 0; transition: all 0.3s; }
+.sdot.running { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.stext { font-size: 12px; color: var(--muted); flex: 1; }
+.sbtn { padding: 4px 14px; border-radius: var(--radius); border: 1px solid var(--border); background: transparent; color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+.sbtn:hover, .sbtn.stop { border-color: var(--accent); color: var(--accent); }
+.tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.tab { padding: 9px 18px; font-size: 11px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.content { flex: 1; overflow: hidden; }
+
+.panel { display: none; padding: 18px 16px 24px; }
+.panel.active { display: block; }
+.sec { margin-bottom: 22px; }
+.sec-label { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+.mode-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.mode-card { padding: 14px 8px 12px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); cursor: pointer; text-align: center; transition: all 0.15s; position: relative; }
+.mode-card:hover { border-color: var(--accent2); }
+.mode-card:hover .mtt { opacity: 1; transform: translateX(-50%) translateY(0); }
+.mode-card.selected { border-color: var(--accent); background: rgba(232,64,28,0.08); }
+.mode-icon { font-size: 24px; margin-bottom: 7px; }
+.mode-name { font-size: 11px; font-weight: 700; }
+.mode-sub  { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.mtt { position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(-4px); width: 185px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); padding: 9px 11px; font-size: 11px; line-height: 1.55; text-align: left; pointer-events: none; opacity: 0; transition: all 0.15s; z-index: 20; }
+.mtt::before { content: ''; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-bottom-color: var(--border); }
+.toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); margin-bottom: 8px; transition: opacity 0.2s; }
+.toggle-row.disabled { opacity: 0.35; pointer-events: none; }
+.tname { font-size: 13px; font-weight: 500; }
+.tdesc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.toggle { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+.toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+.toggle-track { position: absolute; inset: 0; background: var(--border); border-radius: 10px; cursor: pointer; transition: background 0.2s; }
+.toggle input:checked ~ .toggle-track { background: var(--accent); }
+.toggle-track::after { content: ''; position: absolute; left: 3px; top: 3px; width: 14px; height: 14px; border-radius: 50%; background: white; transition: transform 0.2s; }
+.toggle input:checked ~ .toggle-track::after { transform: translateX(16px); }
+.hh-row { display: flex; gap: 8px; }
+.btn-hh { flex: 1; padding: 8px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+.btn-hh:hover { border-color: var(--accent2); color: var(--accent2); }
+.btn-hh.danger:hover { border-color: #e85050; color: #e85050; }
+.path-row { display: flex; gap: 8px; }
+.path-input { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 7px 10px; color: var(--text); font-size: 11px; font-family: 'Consolas', monospace; outline: none; }
+.path-input:focus { border-color: var(--accent); }
+.btn-browse { padding: 7px 12px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.15s; }
+.btn-browse:hover { border-color: var(--accent2); color: var(--accent2); }
+.log-toggle { display: flex; align-items: center; gap: 6px; margin-top: 10px; cursor: pointer; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: 0.05em; user-select: none; }
+.log-toggle:hover { color: var(--text); }
+.log-arrow { display: inline-block; transition: transform 0.2s; font-size: 9px; }
+.log-arrow.open { transform: rotate(90deg); }
+.log-box { display: none; margin-top: 6px; height: 108px; background: #0a0a0e; border: 1px solid var(--border); border-radius: var(--radius); overflow-y: auto; padding: 7px 10px; font-family: 'Consolas', monospace; font-size: 10.5px; line-height: 1.65; color: #7777a0; user-select: text; cursor: text; }
+.log-box.open { display: block; }
+.log-box::-webkit-scrollbar { width: 3px; }
+.log-box::-webkit-scrollbar-thumb { background: #333345; border-radius: 2px; }
+.ll { white-space: pre-wrap; word-break: break-all; }
+.ll.err { color: #e87070; }
+.ll.ok  { color: #6ad46a; }
+.error-msg { background: rgba(232,64,28,0.1); border: 1px solid rgba(232,64,28,0.3); border-radius: var(--radius); padding: 8px 12px; font-size: 11px; color: #ff7a5a; margin-top: 8px; display: none; white-space: pre-wrap; }
+.error-msg.visible { display: block; }
+/* ── Test tab ── */
+.color-prev { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.big-swatch { width: 54px; height: 54px; border-radius: 50%; border: 2px solid var(--border); flex-shrink: 0; transition: background 0.1s; box-shadow: 0 2px 16px rgba(0,0,0,0.5); }
+.color-hex-val { font-size: 14px; font-weight: 700; font-family: 'Consolas', monospace; letter-spacing: 0.04em; }
+.color-rgb-val { font-size: 11px; color: var(--muted); margin-top: 3px; }
+.color-note-val { font-size: 10px; color: var(--accent2); margin-top: 5px; }
+.color-locked-note { color: var(--muted) !important; }
+.slider-row { margin-bottom: 12px; }
+.slider-hdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+.slider-name { font-size: 12px; font-weight: 500; }
+.slider-val { font-size: 11px; color: var(--accent2); font-variant-numeric: tabular-nums; min-width: 40px; text-align: right; }
+input[type=range] { -webkit-appearance: none; width: 100%; height: 4px; border-radius: 2px; outline: none; cursor: pointer; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: white; border: 2px solid rgba(0,0,0,0.25); cursor: pointer; transition: transform 0.1s; }
+input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+input[type=range]:disabled { opacity: 0.3; cursor: not-allowed; }
+.hue-range { background: linear-gradient(to right,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00); }
+.recoil-locked { opacity: 0.35; pointer-events: none; }
+.btn-reset { width: 100%; padding: 9px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+.btn-reset:hover { border-color: #e85050; color: #e85050; }
+.toast {
+  position: fixed;
+  bottom: 20px; left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: rgba(232,64,28,0.95);
+  color: white;
+  padding: 10px 18px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.25s;
+  z-index: 999;
+  white-space: nowrap;
+  max-width: 90%;
+  text-align: center;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="titlebar">
+  <span class="titlebar-title">PS Aim Controller</span>
+  <div class="tb-controls" style="-webkit-app-region:no-drag;display:flex;align-items:center;gap:8px">
+    <button id="themeBtn" onclick="toggleTheme()" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0;line-height:1;color:var(--muted)" title="Toggle light/dark mode">🌙</button>
+    <button class="tb-btn tb-min" onclick="window.api.minimize()"></button>
+    <button class="tb-btn tb-close" onclick="window.close()"></button>
+  </div>
+</div>
+
+<div class="status-bar">
+  <div class="sdot" id="sdot"></div>
+  <span class="stext" id="stext">Driver not running</span>
+  <button class="sbtn" id="sbtn" onclick="toggleDriver()">Start</button>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('mode')">Mode</div>
+  <div class="tab"        onclick="showTab('test')">Test &amp; Tuning</div>
+</div>
+
+<div class="content">
+
+<!-- Mode panel -->
+<div class="panel active" id="panel-mode">
+  <div class="sec">
+    <div class="sec-label">Driver Mode</div>
+    <div class="mode-grid">
+      <div class="mode-card" id="card-ds4" onclick="selectMode('ds4')">
+        <div class="mode-icon">🎮</div>
+        <div class="mode-name">DS4</div>
+        <div class="mode-sub">DualShock 4</div>
+        <div class="mtt">Emulates a virtual DualShock 4 with full gyro/accel passthrough. Best for games that natively support PlayStation inputs. PS Eye tracking is not available in this mode.</div>
+      </div>
+      <div class="mode-card" id="card-lightgun" onclick="selectMode('lightgun')">
+        <div class="mode-icon">🔫</div>
+        <div class="mode-name">Lightgun</div>
+        <div class="mode-sub">XInput / Xbox</div>
+        <div class="mtt">Emulates a virtual Xbox 360 controller. Gyro drives the right stick. PS Eye maps camera position to stick deflection from center. Best for TeknoParrot and XInput lightgun games.</div>
+      </div>
+      <div class="mode-card" id="card-lightgun-raw" onclick="selectMode('lightgun-raw')">
+        <div class="mode-icon">🖱️</div>
+        <div class="mode-name">Raw Input</div>
+        <div class="mode-sub">Mouse + KB</div>
+        <div class="mtt">Emulates a mouse + keyboard. R2 = left click, left stick = WASD, face buttons = game keys. PS Eye maps the sphere directly to the screen cursor. Best for MAME and Demul lightgun games.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="log-toggle" onclick="toggleOptions()" style="margin-bottom:8px"><span class="log-arrow" id="optArrow">▶</span> Options</div>
+    <div id="optionsBox" style="display:none">
+    <div class="toggle-row" id="rowPseye">
+      <div><div class="tname">PS Eye Tracking</div><div class="tdesc">Camera-based absolute aim via PS3 Eye <span style="color:var(--accent2)">(Experimental)</span></div></div>
+      <label class="toggle"><input type="checkbox" id="togPseye" onchange="onPseyeChange()"><span class="toggle-track"></span></label>
+    </div>
+    <div class="toggle-row">
+      <div><div class="tname">Auto-start</div><div class="tdesc">Launch driver automatically when UI opens</div></div>
+      <label class="toggle"><input type="checkbox" id="togAutoload" onchange="save()"><span class="toggle-track"></span></label>
+    </div>
+    <div class="toggle-row">
+      <div><div class="tname">Start Minimized</div><div class="tdesc">Hide to tray on launch (for auto-start)</div></div>
+      <label class="toggle"><input type="checkbox" id="togStartMin" onchange="save()"><span class="toggle-track"></span></label>
+    </div>
+    <div class="toggle-row">
+      <div><div class="tname">Minimize to Tray</div><div class="tdesc">X button hides to tray instead of closing</div></div>
+      <label class="toggle"><input type="checkbox" id="togMinToTray" onchange="save()"><span class="toggle-track"></span></label>
+    </div>
+    <div class="toggle-row">
+      <div><div class="tname">Start on Windows Startup</div><div class="tdesc">Launch UI automatically when Windows starts</div></div>
+      <label class="toggle"><input type="checkbox" id="togStartup" onchange="save()"><span class="toggle-track"></span></label>
+    </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-label">HidHide Device Hiding <span style="color:var(--muted);font-weight:400;text-transform:none;font-size:10px;letter-spacing:0" title="HidHide hides the real PS Aim Controller from other apps so only the emulated device is visible. Required for games that would otherwise pick up both the real and virtual controller simultaneously.">ⓘ</span></div>
+    <div class="hh-row">
+      <button class="btn-hh"        onclick="runHidHide('setup')">⚙️ Setup HidHide</button>
+      <button class="btn-hh danger" onclick="runHidHide('wipe')">🗑️ Reset / Wipe</button>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-label">Driver Executable</div>
+    <div class="path-row">
+      <input class="path-input" id="pathInput" type="text" placeholder="Auto-detecting…" oninput="save()">
+      <button class="btn-browse" onclick="browseExe()">Browse…</button>
+    </div>
+    <div class="log-toggle" style="margin-bottom:0" onclick="toggleLog()"><span class="log-arrow" id="logArrow">▶</span> Driver Log</div>
+    <div class="log-box" id="logBox"></div>
+  </div>
+</div>
+
+<!-- Test panel -->
+<div class="panel" id="panel-test">
+  <div class="sec">
+    <div class="sec-label">LED / Sphere Color</div>
+    <div class="color-prev">
+      <div class="big-swatch" id="bigSwatch"></div>
+      <div style="flex:1">
+        <div class="color-hex-val" id="colorHex">#FF6400</div>
+        <div class="color-rgb-val" id="colorRgb">rgb(255, 100, 0)</div>
+        <div class="color-note-val" id="colorNote">Sphere Color</div>
+      </div>
+      <button class="btn-reset" style="width:auto;padding:5px 10px;font-size:10px;flex-shrink:0;align-self:flex-start" onclick="resetConfig()">Reset Defaults</button>
+    </div>
+    <div class="slider-row">
+      <div class="slider-hdr"><span class="slider-name">Hue</span><span class="slider-val" id="valH">25°</span></div>
+      <input type="range" class="hue-range" id="sliderH" min="0" max="360" oninput="onHsvChange()">
+    </div>
+    <div class="slider-row">
+      <div class="slider-hdr"><span class="slider-name">Saturation</span><span class="slider-val" id="valS">100%</span></div>
+      <input type="range" id="sliderS" min="0" max="100" oninput="onHsvChange()">
+    </div>
+    <div class="slider-row">
+      <div class="slider-hdr"><span class="slider-name">Brightness</span><span class="slider-val" id="valV">100%</span></div>
+      <input type="range" id="sliderV" min="0" max="100" oninput="onHsvChange()">
+    </div>
+  </div>
+
+  <div class="sec" id="gyroSection">
+    <div class="sec-label">Gyro (Lightgun Modes)</div>
+    <div class="slider-row">
+      <div class="slider-hdr"><span class="slider-name">Sensitivity</span><span class="slider-val" id="valSens">75</span></div>
+      <input type="range" id="sliderSens" min="10" max="200" oninput="onGyroChange()">
+    </div>
+    <div class="slider-row">
+      <div class="slider-hdr"><span class="slider-name">Accel Threshold</span><span class="slider-val" id="valAccelThresh">2500</span></div>
+      <input type="range" id="sliderAccelThresh" min="500" max="8000" oninput="onGyroChange()">
+    </div>
+    <div class="slider-row">
+      <div class="slider-hdr"><span class="slider-name">Accel Gain</span><span class="slider-val" id="valAccelGain">0.0006</span></div>
+      <input type="range" id="sliderAccelGain" min="1" max="20" oninput="onGyroChange()">
+    </div>
+  </div>
+
+  <div class="sec" id="recoilSection">
+    <div class="sec-label">Recoil</div>
+    <div class="slider-row">
+      <div class="slider-hdr"><span class="slider-name">Vibration Intensity</span><span class="slider-val" id="valIntensity">255</span></div>
+      <input type="range" id="sliderIntensity" min="0" max="255" oninput="onRecoilChange()">
+    </div>
+    <div class="slider-row">
+      <div class="slider-hdr"><span class="slider-name">Duration (ms)</span><span class="slider-val" id="valDuration">140</span></div>
+      <input type="range" id="sliderDuration" min="20" max="500" oninput="onRecoilChange()">
+    </div>
+    <div class="slider-row">
+      <div class="slider-hdr"><span class="slider-name">Rapid Fire Interval (ms)</span><span class="slider-val" id="valRapid">200</span></div>
+      <input type="range" id="sliderRapid" min="50" max="1000" oninput="onRecoilChange()">
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+let uiCfg = { mode: 'lightgun', pseye: false, autoload: false, startMinimized: false, minimizeToTray: false, startupOnBoot: false, driverPath: '' };
+let driverCfg = {};
+
+function hsvToRgb(h,s,v) {
+  s/=100; v/=100;
+  const i=Math.floor(h/60)%6, f=h/60-Math.floor(h/60);
+  const p=v*(1-s), q=v*(1-f*s), t=v*(1-(1-f)*s);
+  const [r,g,b]=[[v,t,p],[q,v,p],[p,v,t],[p,q,v],[t,p,v],[v,p,q]][i];
+  return [Math.round(r*255),Math.round(g*255),Math.round(b*255)];
+}
+function rgbToHsv(r,g,b) {
+  r/=255;g/=255;b/=255;
+  const mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn;
+  let h=0;
+  if(d){if(mx===r)h=((g-b)/d+6)%6;else if(mx===g)h=(b-r)/d+2;else h=(r-g)/d+4;h*=60;}
+  return[Math.round(h),mx?Math.round(d/mx*100):0,Math.round(mx*100)];
+}
+function toHex(r,g,b){return'#'+[r,g,b].map(x=>x.toString(16).padStart(2,'0').toUpperCase()).join('');}
+
+async function init() {
+  uiCfg = await window.api.readUiConfig();
+  driverCfg = await window.api.readConfig();
+  applyUiConfig();
+  applyDriverConfig();
+  const detected = await window.api.findDriverExe(uiCfg.driverPath || '');
+  if (detected) {
+    document.getElementById('pathInput').value = detected;
+    // Don't save auto-detected path -- clear it so we always re-detect
+    // on next launch rather than getting stuck on a stale location.
+    if (detected !== uiCfg.driverPath) { uiCfg.driverPath = ''; window.api.writeUiConfig(uiCfg); }
+  }
+  const existing = await window.api.getLog();
+  existing.forEach(appendLog);
+  window.api.onLogLine(appendLog);
+  window.api.onDriverExited(() => updateStatus());
+  setInterval(updateStatus, 2000);
+  updateStatus();
+  updateColorTracks();
+}
+
+function applyUiConfig() {
+  selectMode(uiCfg.mode, false);
+  document.getElementById('togPseye').checked    = uiCfg.pseye;
+  document.getElementById('togAutoload').checked = uiCfg.autoload;
+  document.getElementById('togStartMin').checked = uiCfg.startMinimized;
+  document.getElementById('togMinToTray').checked = uiCfg.minimizeToTray || false;
+  document.getElementById('togStartup').checked = uiCfg.startupOnBoot || false;
+  document.getElementById('pathInput').value      = uiCfg.driverPath || '';
+}
+
+function applyDriverConfig() {
+  const isRaw = uiCfg.mode === 'lightgun-raw';
+  const r=isRaw ? (driverCfg.lightgun_raw_led_r??255) : (driverCfg.lightgun_led_r??255);
+  const g=isRaw ? (driverCfg.lightgun_raw_led_g??100) : (driverCfg.lightgun_led_g??100);
+  const b=isRaw ? (driverCfg.lightgun_raw_led_b??0)   : (driverCfg.lightgun_led_b??0);
+  const [h,s,v]=rgbToHsv(r,g,b);
+  document.getElementById('sliderH').value=h;
+  document.getElementById('sliderS').value=s;
+  document.getElementById('sliderV').value=v;
+  document.getElementById('valH').textContent=h+'°';
+  document.getElementById('valS').textContent=s+'%';
+  document.getElementById('valV').textContent=v+'%';
+  updateColorDisplay(r,g,b);
+  const i=driverCfg.lightgun_recoil_intensity??255;
+  const d=driverCfg.lightgun_recoil_duration_ms??140;
+  const rf=driverCfg.lightgun_rapidfire_interval_ms??200;
+  document.getElementById('sliderSens').value=driverCfg.lightgun_sensitivity??75;
+  document.getElementById('valSens').textContent=driverCfg.lightgun_sensitivity??75;
+  document.getElementById('sliderAccelThresh').value=driverCfg.lightgun_accel_threshold??2500;
+  document.getElementById('valAccelThresh').textContent=driverCfg.lightgun_accel_threshold??2500;
+  // Map gain 0.0001-0.002 to slider 1-20
+  const gainSlider=Math.round(((driverCfg.lightgun_accel_gain??0.0006)-0.0001)/0.0001);
+  document.getElementById('sliderAccelGain').value=gainSlider;
+  document.getElementById('valAccelGain').textContent=(driverCfg.lightgun_accel_gain??0.0006).toFixed(4);
+  document.getElementById('sliderIntensity').value=i; document.getElementById('valIntensity').textContent=i;
+  document.getElementById('sliderDuration').value=d;  document.getElementById('valDuration').textContent=d;
+  document.getElementById('sliderRapid').value=rf;    document.getElementById('valRapid').textContent=rf;
+}
+
+function selectMode(mode, doSave=true) {
+  uiCfg.mode=mode;
+  document.querySelectorAll('.mode-card').forEach(c=>c.classList.remove('selected'));
+  document.getElementById(`card-${mode}`)?.classList.add('selected');
+  updatePseyeRow();
+  updateTestLocks();
+  // Reload color sliders for new mode
+  const isRaw = mode === 'lightgun-raw';
+  const cr=isRaw ? (driverCfg.lightgun_raw_led_r??255) : (driverCfg.lightgun_led_r??255);
+  const cg=isRaw ? (driverCfg.lightgun_raw_led_g??100) : (driverCfg.lightgun_led_g??100);
+  const cb=isRaw ? (driverCfg.lightgun_raw_led_b??0)   : (driverCfg.lightgun_led_b??0);
+  const [h,s,v]=rgbToHsv(cr,cg,cb);
+  document.getElementById('sliderH').value=h;
+  document.getElementById('sliderS').value=s;
+  document.getElementById('sliderV').value=v;
+  document.getElementById('valH').textContent=h+'°';
+  document.getElementById('valS').textContent=s+'%';
+  document.getElementById('valV').textContent=v+'%';
+  updateColorDisplay(cr,cg,cb);
+  updateColorTracks();
+  if(doSave) save();
+}
+
+function updatePseyeRow() {
+  const isDs4=uiCfg.mode==='ds4';
+  document.getElementById('rowPseye').classList.toggle('disabled',isDs4);
+  if(isDs4){document.getElementById('togPseye').checked=false;uiCfg.pseye=false;}
+}
+
+function onPseyeChange() {
+  uiCfg.pseye=document.getElementById('togPseye').checked;
+  updateTestLocks();
+  save();
+}
+
+function updateTestLocks() {
+  const colorLocked=uiCfg.mode==='ds4'||uiCfg.pseye;
+  const recoilLocked=uiCfg.mode==='ds4';
+  ['sliderH','sliderS','sliderV'].forEach(id=>document.getElementById(id).disabled=colorLocked);
+  const note=document.getElementById('colorNote');
+  if(uiCfg.pseye){
+    note.textContent='Locked — PS Eye uses violet (80, 0, 150)';
+    note.className='color-note-val color-locked-note';
+    document.getElementById('bigSwatch').style.background='rgb(80,0,150)';
+    document.getElementById('colorHex').textContent='#500096';
+    document.getElementById('colorRgb').textContent='rgb(80, 0, 150)';
+  } else if(uiCfg.mode==='ds4'){
+    note.textContent='Not used in DS4 mode';
+    note.className='color-note-val color-locked-note';
+    document.getElementById('bigSwatch').style.background='#2a2a35';
+    document.getElementById('colorHex').textContent='—';
+    document.getElementById('colorRgb').textContent='—';
+  } else {
+    note.textContent='Sphere Color';
+    note.className='color-note-val';
+    const isRaw2 = uiCfg.mode === 'lightgun-raw';
+    const r=isRaw2 ? (driverCfg.lightgun_raw_led_r??255) : (driverCfg.lightgun_led_r??255);
+    const g=isRaw2 ? (driverCfg.lightgun_raw_led_g??100) : (driverCfg.lightgun_led_g??100);
+    const b=isRaw2 ? (driverCfg.lightgun_raw_led_b??0)   : (driverCfg.lightgun_led_b??0);
+    updateColorDisplay(r,g,b);
+  }
+  document.getElementById('recoilSection').classList.toggle('recoil-locked',recoilLocked);
+  document.getElementById('gyroSection').classList.toggle('recoil-locked',uiCfg.mode==='ds4');
+}
+
+function onHsvChange() {
+  const h=+document.getElementById('sliderH').value;
+  const s=+document.getElementById('sliderS').value;
+  const v=+document.getElementById('sliderV').value;
+  document.getElementById('valH').textContent=h+'°';
+  document.getElementById('valS').textContent=s+'%';
+  document.getElementById('valV').textContent=v+'%';
+  const [r,g,b]=hsvToRgb(h,s,v);
+  updateColorDisplay(r,g,b);
+  updateColorTracks();
+  if (uiCfg.mode === 'lightgun-raw') {
+    driverCfg.lightgun_raw_led_r=r; driverCfg.lightgun_raw_led_g=g; driverCfg.lightgun_raw_led_b=b;
+  } else {
+    driverCfg.lightgun_led_r=r; driverCfg.lightgun_led_g=g; driverCfg.lightgun_led_b=b;
+  }
+  window.api.writeConfig(driverCfg);
+}
+
+function updateColorDisplay(r,g,b) {
+  document.getElementById('bigSwatch').style.background=`rgb(${r},${g},${b})`;
+  document.getElementById('colorHex').textContent=toHex(r,g,b);
+  document.getElementById('colorRgb').textContent=`rgb(${r}, ${g}, ${b})`;
+}
+
+function updateColorTracks() {
+  const h=+document.getElementById('sliderH').value;
+  const s=+document.getElementById('sliderS').value;
+  const v=+document.getElementById('sliderV').value;
+  const [r1,g1,b1]=hsvToRgb(h,0,v), [r2,g2,b2]=hsvToRgb(h,100,v);
+  document.getElementById('sliderS').style.background=`linear-gradient(to right,rgb(${r1},${g1},${b1}),rgb(${r2},${g2},${b2}))`;
+  const [r3,g3,b3]=hsvToRgb(h,s,100);
+  document.getElementById('sliderV').style.background=`linear-gradient(to right,#000,rgb(${r3},${g3},${b3}))`;
+}
+
+function onGyroChange() {
+  const sens = +document.getElementById('sliderSens').value;
+  const thresh = +document.getElementById('sliderAccelThresh').value;
+  const gainSlider = +document.getElementById('sliderAccelGain').value;
+  const gain = +(0.0001 + gainSlider * 0.0001).toFixed(4);
+  document.getElementById('valSens').textContent = sens;
+  document.getElementById('valAccelThresh').textContent = thresh;
+  document.getElementById('valAccelGain').textContent = gain.toFixed(4);
+  driverCfg.lightgun_sensitivity = sens;
+  driverCfg.lightgun_accel_threshold = thresh;
+  driverCfg.lightgun_accel_gain = gain;
+  window.api.writeConfig(driverCfg);
+}
+
+function onRecoilChange() {
+  const i=+document.getElementById('sliderIntensity').value;
+  const d=+document.getElementById('sliderDuration').value;
+  const r=+document.getElementById('sliderRapid').value;
+  document.getElementById('valIntensity').textContent=i;
+  document.getElementById('valDuration').textContent=d;
+  document.getElementById('valRapid').textContent=r;
+  driverCfg.lightgun_recoil_intensity=i;
+  driverCfg.lightgun_recoil_duration_ms=d;
+  driverCfg.lightgun_rapidfire_interval_ms=r;
+  window.api.writeConfig(driverCfg);
+}
+
+function appendLog(line) {
+  const box=document.getElementById('logBox');
+  const div=document.createElement('div');
+  div.className='ll'+(line.includes('ERROR')||line.includes('error')?' err':line.includes('connect')||line.includes('ready')||line.includes('Starting')?' ok':'');
+  div.textContent=line;
+  box.appendChild(div);
+  box.scrollTop=box.scrollHeight;
+}
+
+async function toggleDriver() {
+  const st=await window.api.driverStatus();
+  if(st.running){await window.api.stopDriver();}
+  else{
+    showError('');
+    const result=await window.api.startDriver({...uiCfg,driverPath:document.getElementById('pathInput').value.trim()});
+    if(!result.ok) showError(result.error);
+  }
+  updateStatus();
+}
+
+async function updateStatus() {
+  const st=await window.api.driverStatus();
+  const dot=document.getElementById('sdot'),txt=document.getElementById('stext'),btn=document.getElementById('sbtn');
+  if(st.running){
+    dot.className='sdot running';
+    const label={ds4:'DS4',lightgun:'Lightgun XInput','lightgun-raw':'Raw Input'}[uiCfg.mode]||uiCfg.mode;
+    txt.textContent=`Running — ${label}${uiCfg.pseye?' + PS Eye':''}`;
+    btn.textContent='Stop'; btn.classList.add('stop');
+  } else {
+    dot.className='sdot'; txt.textContent='Driver not running';
+    btn.textContent='Start'; btn.classList.remove('stop');
+  }
+}
+
+let toastTimer = null;
+function showError(msg){
+  if(!msg) return;
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'), 4000);
+}
+
+async function runHidHide(action){
+  appendLog(`HidHide ${action}…`);
+  const r=await window.api.hidhide(action,{...uiCfg,driverPath:document.getElementById('pathInput').value.trim()});
+  if(r.output) appendLog(r.output);
+}
+
+async function browseExe(){const p=await window.api.browseExe();if(p){document.getElementById('pathInput').value=p;uiCfg.driverPath=p;save();}}
+
+function save(){
+  uiCfg.driverPath=document.getElementById('pathInput').value.trim();
+  uiCfg.autoload=document.getElementById('togAutoload').checked;
+  uiCfg.startMinimized=document.getElementById('togStartMin').checked;
+  uiCfg.minimizeToTray=document.getElementById('togMinToTray').checked;
+  uiCfg.startupOnBoot=document.getElementById('togStartup').checked;
+  window.api.writeUiConfig(uiCfg);
+}
+
+function showTab(tab){
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['mode','test'][i]===tab));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById(`panel-${tab}`).classList.add('active');
+  if(tab==='test') updateTestLocks();
+  updateWindowSize();
+}
+
+function toggleOptions(){
+  const box=document.getElementById('optionsBox');
+  const arr=document.getElementById('optArrow');
+  const open=box.style.display==='none';
+  box.style.display=open?'block':'none';
+  arr.classList.toggle('open',open);
+  optionsOpen=open;
+  updateWindowSize();
+}
+
+function toggleLog(){
+  const box=document.getElementById('logBox');
+  const arr=document.getElementById('logArrow');
+  const open=box.classList.toggle('open');
+  arr.classList.toggle('open',open);
+  window.api.resizeWindow(open);
+  if(open) setTimeout(()=>box.scrollTop=box.scrollHeight,50);
+  logOpen=open;
+  updateWindowSize();
+}
+
+let logOpen = false;
+let optionsOpen = false;
+const MODE_BASE = 490;
+const TEST_BASE = 780;
+const OPT_H = 290;
+const LOG_H = 145;
+
+function updateWindowSize(){
+  const onTest = document.getElementById('panel-test').classList.contains('active');
+  if(onTest){
+    window.api.resizeWindow(false, false, TEST_BASE);
+  } else {
+    let h = MODE_BASE;
+  if (optionsOpen) h += OPT_H;
+  if (logOpen) h += LOG_H;
+  else if (optionsOpen) h += 50; // clearance so log toggle stays visible
+    window.api.resizeWindow(false, false, h);
+  }
+}
+
+async function resetConfig() {
+  await window.api.resetConfig();
+  driverCfg = await window.api.readConfig();
+  applyDriverConfig();
+  showError('Config reset to defaults.');
+}
+
+function toggleTheme() {
+  const root = document.documentElement;
+  const isLight = root.getAttribute('data-theme') === 'light';
+  root.setAttribute('data-theme', isLight ? 'dark' : 'light');
+  document.getElementById('themeBtn').textContent = isLight ? '☀️' : '🌙';
+  localStorage.setItem('theme', isLight ? 'dark' : 'light');
+}
+
+// Restore theme on load (light is default)
+(function() {
+  const t = localStorage.getItem('theme') || 'light';
+  if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+})();
+
+init();
+</script>
+<div class="toast" id="toast"></div>
+</body>
+</html>
